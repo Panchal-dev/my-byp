@@ -1,8 +1,11 @@
 # bot.py
 import re
 import asyncio
+import signal
+import sys
 from pyppeteer import launch
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.error import Conflict, NetworkError
 
 # Bot token
 TOKEN = "7462282759:AAEmVQN9xshWqf0GiDJ1ketczGmkUTShrBk"
@@ -140,7 +143,10 @@ async def extract_final_link(url):
         return None
     finally:
         if browser:
-            await browser.close()
+            try:
+                await browser.close()
+            except:
+                pass
 
 # Start command
 async def start(update, context):
@@ -161,13 +167,48 @@ async def handle_message(update, context):
     else:
         await update.message.reply_text("Could not find the final link. Please try again or check the URL.")
 
+# Error handler
+async def error_handler(update, context):
+    error = context.error
+    if isinstance(error, Conflict):
+        print("Conflict error detected: Another bot instance is running. Retrying in 5 seconds...")
+        await asyncio.sleep(5)
+        # Attempt to restart polling
+        raise error  # Let Application handle retry
+    elif isinstance(error, NetworkError):
+        print(f"Network error: {error}. Retrying...")
+        await asyncio.sleep(2)
+    else:
+        print(f"Unexpected error: {error}")
+
+# Shutdown handler
+async def shutdown(application):
+    print("Shutting down bot...")
+    await application.stop()
+    await application.updater.stop()
+    print("Bot stopped.")
+
 # Main function
 def main():
-    application = Application.builder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    print("Bot started...")
-    application.run_polling(allowed_updates=["message"])
+    try:
+        application = Application.builder().token(TOKEN).build()
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_error_handler(error_handler)
+        
+        # Handle shutdown signals
+        def handle_shutdown():
+            asyncio.run_coroutine_threadsafe(shutdown(application), loop=asyncio.get_event_loop())
+            sys.exit(0)
+        
+        signal.signal(signal.SIGINT, lambda s, f: handle_shutdown())
+        signal.signal(signal.SIGTERM, lambda s, f: handle_shutdown())
+        
+        print("Bot started...")
+        application.run_polling(allowed_updates=["message"], drop_pending_updates=True)
+    except Exception as e:
+        print(f"Fatal error in main: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
