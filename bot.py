@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from telegram.error import Conflict, NetworkError
 
 # Bot token (replace with a new token from @BotFather if conflicts persist)
-TOKEN = "7462282759:AAEmVQN9xshWqf0GiDJ1ketczGmkUTShrBk"
+TOKEN = "7462282759:AAHfdKJF5YsB0siG1puT5VYyzbqKGOr-wQ0"
 
 # Regular expression for arolinks.com URLs
 AROLINKS_REGEX = r'^https?://(www\.)?arolinks\.com/.+'
